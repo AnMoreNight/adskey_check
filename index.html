@@ -86,6 +86,16 @@
       border: 1px solid #ffc107;
       color: #856404;
     }
+    .profile-list { margin-top: 12px; }
+    .profile-item {
+      background: rgba(0,0,0,.06);
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .profile-item strong { color: #333; }
   </style>
 </head>
 <body>
@@ -117,9 +127,22 @@
     const btn = document.getElementById('btn');
     const KEY = 'amazonAdsChecker';
 
-    function show(msg, type) {
-      output.textContent = msg;
+    function show(msg, type, html) {
       output.className = type;
+      output.innerHTML = html !== undefined ? msg : '';
+      if (html === undefined) output.textContent = msg;
+    }
+
+    function formatProfiles(list) {
+      if (!list || list.length === 0) return '';
+      return list.map(p => {
+        const name = p.accountInfo?.name || p.name || '-';
+        const id = p.profileId || p.profile_id || p.id || '-';
+        const country = p.countryCode || p.country_code || '-';
+        const currency = p.currencyCode || p.currency_code || '-';
+        const type = p.accountInfo?.type || p.type || '-';
+        return `<div class="profile-item"><strong>${name}</strong><br>ID: ${id} | ${country} | ${currency} | ${type}</div>`;
+      }).join('');
     }
 
     form.addEventListener('submit', async (e) => {
@@ -147,7 +170,14 @@
         const data = await res.json();
 
         if (data.ok) {
-          show('✓ API Key is valid and available!\n\nAccess token: OK\nProfiles: ' + data.profiles + ' found\nExpires in: ' + (data.expiresIn || 'N/A') + ' seconds', 'success');
+          let msg = '✓ API Key is valid and available!\n\nAccess token: OK\nProfiles: ' + data.profiles + ' found\nExpires in: ' + (data.expiresIn || 'N/A') + ' seconds';
+          if (data.profileList && data.profileList.length > 0) {
+            msg = '✓ API Key is valid and available!\n\nAccess token: OK\nProfiles: ' + data.profiles + ' found\nExpires in: ' + (data.expiresIn || 'N/A') + ' seconds';
+            const details = formatProfiles(data.profileList);
+            show(msg + '<div class="profile-list">' + details + '</div>', 'success', true);
+          } else {
+            show(msg, 'success');
+          }
         } else {
           show('✗ ' + (data.error || 'Check failed'), 'error');
         }

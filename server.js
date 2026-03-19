@@ -59,9 +59,9 @@ const server = http.createServer(async (req, res) => {
         });
         if (profilesRes.ok) {
           const d = profilesRes.data;
-          const count = Array.isArray(d) ? d.length : (d?.profiles?.length ?? 0);
+          const list = Array.isArray(d) ? d : (d?.profiles || []);
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, profiles: count, expiresIn: tokenRes.data.expires_in }));
+          res.end(JSON.stringify({ ok: true, profiles: list.length, profileList: list, expiresIn: tokenRes.data.expires_in }));
         } else {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: typeof profilesRes.data === 'string' ? profilesRes.data : JSON.stringify(profilesRes.data) }));

@@ -56,8 +56,8 @@ module.exports = async (req, res) => {
 
     if (profilesRes.ok) {
       const d = profilesRes.data;
-      const count = Array.isArray(d) ? d.length : (d?.profiles?.length ?? 0);
-      return res.status(200).json({ ok: true, profiles: count, expiresIn: tokenRes.data.expires_in });
+      const list = Array.isArray(d) ? d : (d?.profiles || []);
+      return res.status(200).json({ ok: true, profiles: list.length, profileList: list, expiresIn: tokenRes.data.expires_in });
     } else {
       return res.status(200).json({ ok: false, error: typeof profilesRes.data === 'string' ? profilesRes.data : JSON.stringify(profilesRes.data) });
     }
