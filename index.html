@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazon Ads API Key Checker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      font-size: 1.25rem;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #ff9900;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #ff9900;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:hover { background: #e88b00; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    #output {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      min-height: 60px;
+    }
+    #output.success {
+      background: #d4edda;
+      border: 1px solid #28a745;
+      color: #155724;
+    }
+    #output.error {
+      background: #f8d7da;
+      border: 1px solid #dc3545;
+      color: #721c24;
+    }
+    #output.pending {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      color: #856404;
+    }
+  </style>
+</head>
+<body>
+  <h1>Amazon Ads API Key Checker</h1>
+  <form id="form">
+    <label>Client ID</label>
+    <input type="text" id="clientId" placeholder="amzn1.application-oa2-client.xxx" autocomplete="off">
+    <label>Client Secret</label>
+    <input type="password" id="clientSecret" placeholder="Your client secret" autocomplete="off">
+    <label>Refresh Token</label>
+    <input type="text" id="refreshToken" placeholder="Atzr|xxx" autocomplete="off">
+    <label>Region</label>
+    <select id="region">
+      <option value="NA">North America</option>
+      <option value="EU">Europe</option>
+      <option value="FE">Far East</option>
+    </select>
+    <div class="checkbox-row">
+      <input type="checkbox" id="saveFields" checked>
+      <label for="saveFields" style="margin:0">Save credentials for next time</label>
+    </div>
+    <button type="submit" id="btn">Check API Key</button>
+  </form>
+  <div id="output"></div>
+
+  <script>
+    const form = document.getElementById('form');
+    const output = document.getElementById('output');
+    const btn = document.getElementById('btn');
+    const KEY = 'amazonAdsChecker';
+
+    function show(msg, type) {
+      output.textContent = msg;
+      output.className = type;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const clientId = document.getElementById('clientId').value.trim();
+      const clientSecret = document.getElementById('clientSecret').value.trim();
+      const refreshToken = document.getElementById('refreshToken').value.trim();
+
+      if (!clientId || !clientSecret || !refreshToken) {
+        show('Please fill in all fields.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      show('Checking...', 'pending');
+
+      const region = document.getElementById('region').value;
+      const apiUrls = { NA: 'https://advertising-api.amazon.com', EU: 'https://advertising-api-eu.amazon.com', FE: 'https://advertising-api-fe.amazon.com' };
+
+      try {
+        const tokenRes = await fetch('https://api.amazon.com/auth/o2/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ grant_type: 'refresh_token', client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken })
+        });
+        const tokenData = await tokenRes.json();
+
+        if (!tokenRes.ok) {
+          show('✗ Invalid credentials\n\n' + (tokenData.error_description || tokenData.error || JSON.stringify(tokenData)), 'error');
+          return;
+        }
+
+        show('Got access token. Checking availability...', 'pending');
+
+        const profilesRes = await fetch(apiUrls[region] + '/v2/profiles', {
+          headers: { 'Authorization': 'Bearer ' + tokenData.access_token, 'Amazon-Advertising-API-ClientId': clientId, 'Content-Type': 'application/json' }
+        });
+        const profilesData = profilesRes.ok ? await profilesRes.json() : await profilesRes.text();
+
+        if (profilesRes.ok) {
+          const count = Array.isArray(profilesData) ? profilesData.length : (profilesData?.profiles?.length ?? 0);
+          show('✓ API Key is valid and available!\n\nAccess token: OK\nProfiles: ' + count + ' found\nExpires in: ' + (tokenData.expires_in || 'N/A') + ' seconds', 'success');
+        } else {
+          show('✗ Key not available for Ads API\n\n' + (typeof profilesData === 'string' ? profilesData : JSON.stringify(profilesData)), 'error');
+        }
+      } catch (err) {
+        show('✗ Error: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+
+      if (document.getElementById('saveFields').checked) {
+        try {
+          localStorage.setItem(KEY, JSON.stringify({ clientId, clientSecret, refreshToken, region }));
+        } catch (_) {}
+      } else {
+        try { localStorage.removeItem(KEY); } catch (_) {}
+      }
+    });
+
+    try {
+      const saved = localStorage.getItem(KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.clientId) document.getElementById('clientId').value = d.clientId;
+        if (d.clientSecret) document.getElementById('clientSecret').value = d.clientSecret;
+        if (d.refreshToken) document.getElementById('refreshToken').value = d.refreshToken;
+        if (d.region) document.getElementById('region').value = d.region;
+      }
+    } catch (_) {}
+  </script>
+</body>
+</html>
